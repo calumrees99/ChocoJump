@@ -11,7 +11,7 @@ import (
 var (
 	player           *ebiten.Image
 	bg               *ebiten.Image
-	chocolateLog     *ebiten.Image
+	chocoLog         *ebiten.Image
 	jumpHeight       float64
 	landingHeight    float64
 	jumpUpComplete   bool
@@ -20,8 +20,13 @@ var (
 )
 
 const (
-	screenW, screenH = 1000, 667
-	playerW, playerH = 128, 128
+	screenW, screenH                             = 1000, 667
+	playerW, playerH                             = 128, 128
+	chocoLogW, chocoLogH                         = 128, 128
+	playerHitboxW, playerHitboxH                 = 88, 100
+	playerHitboxOffsetX, playerHitboxOffsetY     = 40, 25
+	chocoLogHitboxW, chocoLogHitboxH             = 40, 60
+	chocoLogHitboxOffsetX, chocoLogHitboxOffsetY = 30, 50
 )
 
 type Game struct {
@@ -31,6 +36,12 @@ type Game struct {
 
 	// Player velocity.
 	playerVelocity float64
+
+	// Choco log position
+	chocoLogX, chocoLogY float64
+
+	// Choco log velocity
+	chocoLogVelocity float64
 }
 
 func (g *Game) Update() error {
@@ -45,7 +56,7 @@ func (g *Game) Update() error {
 	}
 
 	if !jumpUpComplete && jumpHeight < g.playerVelocity {
-		g.playerVelocity -= 2
+		g.playerVelocity -= 3
 		if jumpHeight > g.playerVelocity {
 			jumpUpComplete = true
 		}
@@ -54,7 +65,7 @@ func (g *Game) Update() error {
 	if jumpUpComplete {
 		jumpHeight = 0
 		if jumpHeight > g.playerVelocity {
-			g.playerVelocity += 2
+			g.playerVelocity += 3
 			if jumpHeight < g.playerVelocity {
 				jumpDownComplete = true
 			}
@@ -65,9 +76,32 @@ func (g *Game) Update() error {
 		jumpComplete = true
 	}
 
-	// Apply velocity.
+	// Apply player velocity.
 	g.playerY += g.playerVelocity
+
+	// Move chocoLog
+	if 0 < 1 {
+		g.chocoLogVelocity -= 4
+		g.chocoLogX += g.chocoLogVelocity
+	}
+
+	// Check collision between player and chocoLog
+	if checkCollision(
+		g.playerX+playerHitboxOffsetX, g.playerY+playerHitboxOffsetY, playerHitboxW, playerHitboxH,
+		g.chocoLogX+chocoLogHitboxOffsetX, g.chocoLogY+chocoLogHitboxOffsetY, chocoLogHitboxW, chocoLogHitboxH,
+	) {
+		log.Println("Collision detected!")
+		// Example: stop chocoLog
+		g.chocoLogVelocity = 0
+	}
 	return nil
+}
+
+func checkCollision(px, py, pw, ph, ox, oy, ow, oh float64) bool {
+	return px < ox+ow &&
+		px+pw > ox &&
+		py < oy+oh &&
+		py+ph > oy
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -80,15 +114,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	op.GeoM.Translate(g.playerX, g.playerY)
 	screen.DrawImage(player, op)
 
-	// Draw ChocolateLog
+	// Draw chocoLog
 	clOp := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(0, 0)
-	screen.DrawImage(chocolateLog, clOp)
+	clOp.GeoM.Translate(g.chocoLogX, g.chocoLogY)
+	screen.DrawImage(chocoLog, clOp)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (w, h int) {
 	g.playerX = screenW/2 - playerW/2
 	g.playerY = screenH - playerH - 65
+	g.chocoLogX = screenW - chocoLogW
+	g.chocoLogY = screenH - chocoLogH - 35
 	return screenW, screenH
 }
 
@@ -102,7 +138,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	chocolateLog, _, err = ebitenutil.NewImageFromFile("assets/chocolateLog.png")
+	chocoLog, _, err = ebitenutil.NewImageFromFile("assets/chocoLog.png")
 	if err != nil {
 		log.Fatal(err)
 	}
