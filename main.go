@@ -9,9 +9,14 @@ import (
 )
 
 var (
-	player       *ebiten.Image
-	bg           *ebiten.Image
-	chocolateLog *ebiten.Image
+	player           *ebiten.Image
+	bg               *ebiten.Image
+	chocolateLog     *ebiten.Image
+	jumpHeight       float64
+	landingHeight    float64
+	jumpUpComplete   bool
+	jumpDownComplete bool
+	jumpComplete     bool = true
 )
 
 const (
@@ -30,18 +35,34 @@ type Game struct {
 
 func (g *Game) Update() error {
 
-	// Apply gravity.
-	maxFallSpeed := 0.5
-	if g.playerVelocity < maxFallSpeed {
-		g.playerVelocity += 1
-		if g.playerVelocity > maxFallSpeed {
-			g.playerVelocity = maxFallSpeed
+	// Handle jump.
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) && jumpComplete {
+		jumpHeight = -150
+		g.playerVelocity = 0.5
+		jumpUpComplete = false
+		jumpDownComplete = false
+		jumpComplete = false
+	}
+
+	if !jumpUpComplete && jumpHeight < g.playerVelocity {
+		g.playerVelocity -= 2
+		if jumpHeight > g.playerVelocity {
+			jumpUpComplete = true
 		}
 	}
 
-	// Handle jump.
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-		g.playerVelocity = -150
+	if jumpUpComplete {
+		jumpHeight = 0
+		if jumpHeight > g.playerVelocity {
+			g.playerVelocity += 2
+			if jumpHeight < g.playerVelocity {
+				jumpDownComplete = true
+			}
+		}
+	}
+
+	if jumpUpComplete && jumpDownComplete {
+		jumpComplete = true
 	}
 
 	// Apply velocity.
