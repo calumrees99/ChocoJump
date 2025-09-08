@@ -1,0 +1,19 @@
+## Overview
+
+ChocoJump is a basic jumping game created using the go game engine Ebitengine: https://ebitengine.org/ and my first introduction to game development!
+
+## Screenshot
+<img title="Screenshot" alt="Alt text" src="./screenshot.png">
+
+## Sources used during development
+
+Goodgis:
+* YouTube: https://www.youtube.com/watch?v=FJEIhUoLVj4
+* Repo: https://gitlab.com/Goodgis/go-rocket-go
+
+Trevor Tutorials:
+* Youtube: https://www.youtube.com/watch?v=_B4dzWMsVQY
+* Repo: https://codeberg.org/tslocum/trevors-tutorials
+
+ChatGpt: https://chatgpt.com/
+
