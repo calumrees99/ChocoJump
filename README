@@ -3,7 +3,7 @@
 ChocoJump is a basic jumping game created using the go game engine Ebitengine: https://ebitengine.org/ and my first introduction to game development!
 
 ## Screenshot
-<img title="Screenshot" alt="Alt text" src="./screenshot.png">
+![alt](./screenshot.png)
 
 ## Sources used during development
 
