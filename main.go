@@ -1,22 +1,44 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"math/rand"
+	"os"
+	"time"
+
+	"golang.org/x/image/colornames"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 var (
-	player       *ebiten.Image
-	bg           *ebiten.Image
-	chocolateLog *ebiten.Image
+	player           *ebiten.Image
+	bg               *ebiten.Image
+	chocoLog         *ebiten.Image
+	jumpHeight       float64
+	landingHeight    float64
+	jumpUpComplete   bool
+	jumpDownComplete bool
+	jumpComplete     bool    = true
+	logSpeed         float64 = -4
+	myFont           font.Face
 )
 
 const (
-	screenW, screenH = 1000, 667
-	playerW, playerH = 128, 128
+	screenW, screenH                             = 1000, 667
+	playerW, playerH                             = 128, 128
+	chocoLogW, chocoLogH                         = 128, 128
+	playerHitboxW, playerHitboxH                 = 88, 100
+	playerHitboxOffsetX, playerHitboxOffsetY     = 40, 25
+	chocoLogHitboxW, chocoLogHitboxH             = 40, 60
+	chocoLogHitboxOffsetX, chocoLogHitboxOffsetY = 30, 50
+	normalFontSize                               = 24
 )
 
 type Game struct {
@@ -26,27 +48,158 @@ type Game struct {
 
 	// Player velocity.
 	playerVelocity float64
+
+	// Choco log position
+	chocoLogX, chocoLogY float64
+
+	// Choco log velocity
+	chocoLogVelocity float64
+
+	logs       []Log
+	spawnTimer int
+	spawnSpeed int
+	gameOver   bool
+	score      int
+	highScore  int
+}
+
+type Log struct {
+	x, y     float64
+	velocity float64
 }
 
 func (g *Game) Update() error {
 
-	// Apply gravity.
-	maxFallSpeed := 0.5
-	if g.playerVelocity < maxFallSpeed {
-		g.playerVelocity += 1
-		if g.playerVelocity > maxFallSpeed {
-			g.playerVelocity = maxFallSpeed
+	if g.gameOver {
+		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+			g.reset()
 		}
+		return nil
 	}
 
 	// Handle jump.
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-		g.playerVelocity = -150
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) && jumpComplete {
+		jumpHeight = -150
+		g.playerVelocity = 0.5
+		jumpUpComplete = false
+		jumpDownComplete = false
+		jumpComplete = false
 	}
 
-	// Apply velocity.
+	if !jumpUpComplete && jumpHeight < g.playerVelocity {
+		g.playerVelocity -= 4
+		if jumpHeight > g.playerVelocity {
+			jumpUpComplete = true
+		}
+	}
+
+	if jumpUpComplete {
+		jumpHeight = 0
+		if jumpHeight > g.playerVelocity {
+			g.playerVelocity += 3
+			if jumpHeight < g.playerVelocity {
+				jumpDownComplete = true
+			}
+		}
+	}
+
+	if jumpUpComplete && jumpDownComplete {
+		jumpComplete = true
+	}
+
+	// Apply player velocity.
 	g.playerY += g.playerVelocity
+
+	// Spawn logs
+	g.spawnTimer--
+	if g.spawnTimer <= 0 {
+		logSpeed -= 0.5
+		g.spawnLog(logSpeed)
+		g.spawnTimer = 120 + rand.Intn(60) // Spawns logs every 2-3 seconds
+	}
+
+	// Update logs
+	for i := range g.logs {
+		g.logs[i].x += g.logs[i].velocity
+		if g.logs[i].x+chocoLogW < g.playerX && g.logs[i].x+chocoLogW > g.playerX+g.logs[i].velocity {
+			g.score++
+			if g.score > g.highScore {
+				g.highScore = g.score
+			}
+		}
+	}
+
+	// Remove logs off screen
+	newLogs := g.logs[:0]
+	for _, logObj := range g.logs {
+		if logObj.x+chocoLogW > 0 {
+			newLogs = append(newLogs, logObj)
+		}
+	}
+
+	g.logs = newLogs
+
+	// Check collisions
+	for _, logObj := range g.logs {
+		if checkCollision(
+			g.playerX+playerHitboxOffsetX, g.playerY+playerHitboxOffsetY, playerHitboxW, playerHitboxH,
+			logObj.x+chocoLogHitboxOffsetX, logObj.y+chocoLogHitboxOffsetY, chocoLogHitboxW, chocoLogHitboxH,
+		) {
+			log.Println("Collision detected!")
+			jumpComplete = true
+			g.gameOver = true
+		}
+	}
 	return nil
+}
+
+func (g *Game) spawnLog(velocity float64) {
+	g.logs = append(g.logs, Log{
+		x:        screenW - chocoLogW,
+		y:        screenH - chocoLogH - 35,
+		velocity: velocity,
+	})
+}
+
+func (g *Game) reset() {
+	g.logs = nil
+	g.spawnTimer = 60 + rand.Intn(120)
+	g.playerVelocity = 0
+	g.playerX = screenW/2 - playerW/2
+	g.playerY = screenH - playerH - 65
+	g.gameOver = false
+	g.score = 0
+	g.highScore = g.highScore
+	logSpeed = -4
+
+}
+
+func checkCollision(px, py, pw, ph, ox, oy, ow, oh float64) bool {
+	return px < ox+ow &&
+		px+pw > ox &&
+		py < oy+oh &&
+		py+ph > oy
+}
+
+func loadFont() font.Face {
+	ttfBytes, err := os.ReadFile("assets/comicJungle/comicJungle.ttf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	tt, err := opentype.Parse(ttfBytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+	const dpi = 72
+	face, err := opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    36,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return face
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -54,25 +207,41 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	bgOp := &ebiten.DrawImageOptions{}
 	screen.DrawImage(bg, bgOp)
 
+	// Logs
+	for _, logObj := range g.logs {
+		clOp := &ebiten.DrawImageOptions{}
+		clOp.GeoM.Translate(logObj.x, logObj.y)
+		screen.DrawImage(chocoLog, clOp)
+	}
+
+	if g.gameOver {
+		ebitenutil.DebugPrint(screen, "GAME OVER! Press R to restart")
+	}
+
+	// Draw Scores
+	scoreText := fmt.Sprintf("SCORE: %d", g.score)
+	highScoreText := fmt.Sprintf("HIGH SCORE: %d", g.highScore)
+	text.Draw(screen, scoreText, myFont, 20, 40, colornames.Black)
+	text.Draw(screen, highScoreText, myFont, 20, 80, colornames.Black)
+
 	// Draw player
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(g.playerX, g.playerY)
 	screen.DrawImage(player, op)
-
-	// Draw ChocolateLog
-	clOp := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(0, 0)
-	screen.DrawImage(chocolateLog, clOp)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (w, h int) {
 	g.playerX = screenW/2 - playerW/2
 	g.playerY = screenH - playerH - 65
+	g.chocoLogX = screenW - chocoLogW
+	g.chocoLogY = screenH - chocoLogH - 35
 	return screenW, screenH
 }
 
 func init() {
 	var err error
+	myFont = loadFont()
+
 	bg, _, err = ebitenutil.NewImageFromFile("assets/background.png")
 	if err != nil {
 		log.Fatal(err)
@@ -81,13 +250,13 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	chocolateLog, _, err = ebitenutil.NewImageFromFile("assets/chocolateLog.png")
+	chocoLog, _, err = ebitenutil.NewImageFromFile("assets/chocoLog.png")
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	ebiten.SetWindowSize(screenW, screenH)
 	ebiten.SetWindowTitle("ChocoJump")
 	if err := ebiten.RunGame(&Game{}); err != nil {
