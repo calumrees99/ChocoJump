@@ -169,7 +169,6 @@ func (g *Game) reset() {
 	g.playerY = screenH - playerH - 65
 	g.gameOver = false
 	g.score = 0
-	g.highScore = g.highScore
 	logSpeed = -4
 
 }
