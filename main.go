@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
+	mrand "math/rand"
 	"os"
 	"time"
 
@@ -117,9 +119,16 @@ func (g *Game) Update() error {
 	// Spawn logs
 	g.spawnTimer--
 	if g.spawnTimer <= 0 {
+		temp, err := rand.Int(rand.Reader, big.NewInt(60))
+		if err != nil {
+			panic(err)
+		}
+		num := temp.Int64()
+
 		logSpeed -= 0.5
 		g.spawnLog(logSpeed)
-		g.spawnTimer = 120 + rand.Intn(60) // Spawns logs every 2-3 seconds
+
+		g.spawnTimer = 120 + int(num) // Spawns logs every 2-3 seconds
 	}
 
 	// Update logs
@@ -176,8 +185,13 @@ func (g *Game) spawnLog(velocity float64) {
 }
 
 func (g *Game) reset() {
+	temp, err := rand.Int(rand.Reader, big.NewInt(60))
+	if err != nil {
+		panic(err)
+	}
+	num := temp.Int64()
 	g.logs = nil
-	g.spawnTimer = 60 + rand.Intn(120)
+	g.spawnTimer = 60 + int(num)
 	g.playerVelocity = 0
 	g.playerX = screenW/2 - playerW/2
 	g.playerY = screenH - playerH - 65
@@ -269,7 +283,7 @@ func init() {
 	}
 }
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	mrand.Seed(time.Now().UnixNano())
 	ebiten.SetWindowSize(screenW, screenH)
 	ebiten.SetWindowTitle("ChocoJump")
 	if err := ebiten.RunGame(&Game{}); err != nil {
