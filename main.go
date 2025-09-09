@@ -68,6 +68,10 @@ type Log struct {
 	velocity float64
 }
 
+type Hitbox struct {
+	x, y, w, h float64
+}
+
 func (g *Game) Update() error {
 
 	if g.gameOver {
@@ -142,8 +146,18 @@ func (g *Game) Update() error {
 	// Check collisions
 	for _, logObj := range g.logs {
 		if checkCollision(
-			g.playerX+playerHitboxOffsetX, g.playerY+playerHitboxOffsetY, playerHitboxW, playerHitboxH,
-			logObj.x+chocoLogHitboxOffsetX, logObj.y+chocoLogHitboxOffsetY, chocoLogHitboxW, chocoLogHitboxH,
+			Hitbox{
+				x: g.playerX + playerHitboxOffsetX,
+				y: g.playerY + playerHitboxOffsetY,
+				w: playerHitboxW,
+				h: playerHitboxH,
+			},
+			Hitbox{
+				x: logObj.x + chocoLogHitboxOffsetX,
+				y: logObj.y + chocoLogHitboxOffsetY,
+				w: chocoLogHitboxW,
+				h: chocoLogHitboxH,
+			},
 		) {
 			log.Println("Collision detected!")
 			jumpComplete = true
@@ -173,11 +187,11 @@ func (g *Game) reset() {
 
 }
 
-func checkCollision(px, py, pw, ph, ox, oy, ow, oh float64) bool {
-	return px < ox+ow &&
-		px+pw > ox &&
-		py < oy+oh &&
-		py+ph > oy
+func checkCollision(p Hitbox, o Hitbox) bool {
+	return p.x < o.x+o.w &&
+		p.x+p.w > o.x &&
+		p.y < o.y+o.h &&
+		p.y+p.h > o.y
 }
 
 func loadFont() font.Face {
